@@ -139,7 +139,7 @@ void KeyOff(byte channel, byte key, byte velocity);
 void ProgramChange(byte channel, byte program);
 void PitchChange(byte channel, int pitch);
 void ControlChange(byte channel, byte control, byte value);
-void SystemExclusive(byte *data, uint16_t length);
+void SystemExclusive(const byte *data, uint16_t length, bool last);
 void HandleFavoriteButtons(byte portValue);
 bool LoadFile(byte strategy);
 void BlinkLED(byte led);
@@ -671,70 +671,102 @@ void DumpVoiceData(Voice v) //Used to check operator settings from loaded OPM fi
 
 void PitchChange(byte channel, int pitch)
 {
-  if(channel == YM_CHANNEL || channel == YM_VELOCITY_CHANNEL || channel == YM_VST_ALL)
-  {
-    pitchBendYM = pitch;
-    for(int i = 0; i<MAX_CHANNELS_YM; i++)
-    {
-      ym2612.AdjustPitch(i, pitch);
-    }
-  }
-  // else if(channel > YM_VST_ALL && channel <= YM_VST_6)
+  // if(channel == YM_CHANNEL || channel == YM_VELOCITY_CHANNEL || channel == YM_VST_ALL)
   // {
   //   pitchBendYM = pitch;
-  //   ym2612.AdjustPitch(channel-11, pitch);
+  //   for(int i = 0; i<MAX_CHANNELS_YM; i++)
+  //   {
+  //     ym2612.AdjustPitch(i, pitch);
+  //   }
   // }
-  else if(channel == PSG_CHANNEL || channel == PSG_VELOCITY_CHANNEL)
-  {
-    for(int i = 0; i<MAX_CHANNELS_PSG; i++)
-    {
-      sn76489.PitchChange(i, pitch);
-    }
-  }
+  // // else if(channel > YM_VST_ALL && channel <= YM_VST_6)
+  // // {
+  // //   pitchBendYM = pitch;
+  // //   ym2612.AdjustPitch(channel-11, pitch);
+  // // }
+  // else if(channel == PSG_CHANNEL || channel == PSG_VELOCITY_CHANNEL)
+  // {
+  //   for(int i = 0; i<MAX_CHANNELS_PSG; i++)
+  //   {
+  //     sn76489.PitchChange(i, pitch);
+  //   }
+  // }
 }
 
 bool ymVelocityEnabledFlag = false;
+/**
+ * @brief MIDI Key On message
+ * 
+ * @param channel MIDI channel [0-15]
+ * @param key Key number [0-127]
+ * @param velocity Velocity [0-127]
+ */
 void KeyOn(byte channel, byte key, byte velocity)
 {
   stopLCDFileUpdate = true;
-  if(channel == YM_CHANNEL || channel == YM_VELOCITY_CHANNEL)
+  // by now, velocity is disabled
+  // check which slot maps to current key + channel
+  // fixme - ignore it by now
+  // current channel mapping
+  // ym => [0-5] 
+  // sn => 6
+  if(channel == MAX_CHANNELS_YM + 1)
   {
-    if(isFileValid || currentFavorite != 0xFF)
-    {
-      if(channel == YM_VELOCITY_CHANNEL)
-        ymVelocityEnabledFlag = true;
-      else if(ymVelocityEnabledFlag)
-      {
-        ymVelocityEnabledFlag = false;
-        ym2612.SetVoice(voices[currentProgram]);
-      }
-      ym2612.SetChannelOn(key+SEMITONE_ADJ_YM, velocity, ymVelocityEnabledFlag);
-    }
-  }
-  else if(channel == PSG_CHANNEL || channel == PSG_VELOCITY_CHANNEL)
+    sn76489.SetChannelOn(key+SEMITONE_ADJ_PSG, velocity, false);
+  } 
+  else if (channel >= 1 && channel <= MAX_CHANNELS_YM)
   {
-    sn76489.SetChannelOn(key+SEMITONE_ADJ_PSG, velocity, channel == PSG_VELOCITY_CHANNEL);
+    ym2612.SetVoiceManual(channel, voices[channel]);
+    ym2612.SetChannelOn(key+SEMITONE_ADJ_YM, velocity, channel, false);
   }
-  else if(channel == PSG_NOISE_CHANNEL)
-  {
-    sn76489.SetNoiseOn(key, velocity, 1);
-  }
+
+  // if(channel == YM_CHANNEL || channel == YM_VELOCITY_CHANNEL)
+  // {
+  //   if(isFileValid || currentFavorite != 0xFF)
+  //   {
+  //     if(channel == YM_VELOCITY_CHANNEL)
+  //       ymVelocityEnabledFlag = true;
+  //     else if(ymVelocityEnabledFlag)
+  //     {
+  //       ymVelocityEnabledFlag = false;
+  //       ym2612.SetVoice(voices[currentProgram]);
+  //     }
+  //     ym2612.SetChannelOnOld(key+SEMITONE_ADJ_YM, velocity, ymVelocityEnabledFlag);
+  //   }
+  // }
+  // else if(channel == PSG_CHANNEL || channel == PSG_VELOCITY_CHANNEL)
+  // {
+  //   sn76489.SetChannelOn(key+SEMITONE_ADJ_PSG, velocity, channel == PSG_VELOCITY_CHANNEL);
+  // }
+  // else if(channel == PSG_NOISE_CHANNEL)
+  // {
+  //   sn76489.SetNoiseOn(key, velocity, 1);
+  // }
 }
 
 void KeyOff(byte channel, byte key, byte velocity)
 {
-  if(channel == YM_CHANNEL || channel == YM_VELOCITY_CHANNEL)
-  {
-    ym2612.SetChannelOff(key+SEMITONE_ADJ_YM);
-  }
-  else if(channel == PSG_CHANNEL || channel == PSG_VELOCITY_CHANNEL)
+  if(channel == MAX_CHANNELS_YM + 1)
   {
     sn76489.SetChannelOff(key+SEMITONE_ADJ_PSG);
-  }
-  else if(channel == PSG_NOISE_CHANNEL)
+  } 
+  else if (channel >= 1 && channel <= MAX_CHANNELS_YM)
   {
-    sn76489.SetNoiseOff(key);
+    ym2612.SetChannelOff(key+SEMITONE_ADJ_YM, channel);
   }
+
+  // if(channel == YM_CHANNEL || channel == YM_VELOCITY_CHANNEL)
+  // {
+  //   ym2612.SetChannelOffOld(key+SEMITONE_ADJ_YM);
+  // }
+  // else if(channel == PSG_CHANNEL || channel == PSG_VELOCITY_CHANNEL)
+  // {
+  //   sn76489.SetChannelOff(key+SEMITONE_ADJ_PSG);
+  // }
+  // else if(channel == PSG_NOISE_CHANNEL)
+  // {
+  //   sn76489.SetNoiseOff(key);
+  // }
 }
 
 void ControlChange(byte channel, byte control, byte value)
@@ -810,7 +842,7 @@ void SendPatchSysex(uint8_t slot)
   usbMIDI.sendSysEx(60, data, true);
 }
 
-void SystemExclusive(byte *data, uint16_t length)
+void SystemExclusive(const byte *data, uint16_t length, bool last)
 {
   //Serial.print("SYSEX: "); Serial.print(" DATA: "); Serial.print(data[0]); Serial.print(" LENGTH: "); Serial.println(length);
   VSTMode();
