@@ -27,7 +27,7 @@ void HandleRotaryButtonDown()
 void HandleRotaryEncoder()
 {
   long enc = encoder.read();
-  if(enc != encoderPos && enc % 4 == 0)
+  if (enc != encoderPos && enc % 4 == 0)
   {
     encoderPos = enc;
     cursorIndex = encoderPos % maxCurrentOptions;
@@ -36,19 +36,20 @@ void HandleRotaryEncoder()
   }
 }
 
-void ScrollFileNameLCD(LiquidCrystal* lcd)
+void ScrollFileNameLCD(LiquidCrystal *lcd)
 {
   String sbStr = scrollFilename;
-  int filenameLength = sbStr.length();;
-  if(filenameLength > maxFilenameDisplayLength)
+  int filenameLength = sbStr.length();
+  ;
+  if (filenameLength > maxFilenameDisplayLength)
   {
     uint32_t curMilli = millis();
-    sbStr = sbStr.substring(fileNameScrollIndex, fileNameScrollIndex+maxFilenameDisplayLength);
-    if(curMilli - prevMilli >= scrollDelay)
+    sbStr = sbStr.substring(fileNameScrollIndex, fileNameScrollIndex + maxFilenameDisplayLength);
+    if (curMilli - prevMilli >= scrollDelay)
     {
       prevMilli = curMilli;
       fileNameScrollIndex++;
-      if(fileNameScrollIndex+maxFilenameDisplayLength >= scrollFilename.length())
+      if (fileNameScrollIndex + maxFilenameDisplayLength >= scrollFilename.length())
       {
         fileNameScrollIndex = 0;
         scrollDelay *= 5;
@@ -64,7 +65,7 @@ void ScrollFileNameLCD(LiquidCrystal* lcd)
   lcd->print(sbStr);
 }
 
-void DrawMainMenu(LiquidCrystal* lcd, bool SDok, char* filename)
+void DrawMainMenu(LiquidCrystal *lcd, bool SDok, char *filename)
 {
   maxCurrentOptions = 3;
   lcd->clear();
@@ -88,10 +89,11 @@ void DrawMainMenu(LiquidCrystal* lcd, bool SDok, char* filename)
   filenameRow = 1;
   scrollFilename = filename;
   maxFilenameDisplayLength = 14;
-  if (cursorIndex != 0) {
+  if (cursorIndex != 0)
+  {
     fileNameScrollIndex = 0;
   }
-  ScrollFileNameLCD(lcd);    
+  ScrollFileNameLCD(lcd);
   lcd->setCursor(1, 2);
   lcd->print("YAMAHA settings   >");
   lcd->setCursor(1, 3);
@@ -100,18 +102,21 @@ void DrawMainMenu(LiquidCrystal* lcd, bool SDok, char* filename)
   lcd->write(byte(0));
 }
 
-void DrawYamahaSettings(LiquidCrystal* lcd)
+void DrawYamahaSettings(LiquidCrystal *lcd)
 {
   maxCurrentOptions = 3;
   lcd->clear();
   lcd->setCursor(0, 1);
   lcd->print("Back              <");
-  if (yamahaMode == UNIFIED) {
+  if (yamahaMode == UNIFIED)
+  {
     lcd->setCursor(1, 1);
     lcd->print("YAMAHA      Unified");
     lcd->setCursor(1, 2);
     lcd->print("Voice settings    >");
-  } else if (yamahaMode == SEPARATE) {
+  }
+  else if (yamahaMode == SEPARATE)
+  {
     lcd->setCursor(1, 1);
     lcd->print("YAMAHA     Separate");
     lcd->setCursor(1, 2);

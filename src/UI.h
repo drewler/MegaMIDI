@@ -14,13 +14,11 @@
 #define LFO_TOG 7
 #define ENC_BTN 0
 
-enum screens { MAIN_MENU, YAMAHA_SETTINGS, YAMAHA_SLOTS, YAMAHA_SLOT, SN_SETTINGS, SN_SLOTS, SN_SLOT };
-
 void HandleRotaryButtonDown();
 void HandleRotaryEncoder();
 
-void ScrollFileNameLCD(LiquidCrystal* lcd);
-void DrawMainMenu(LiquidCrystal* lcd, bool SDok, char* filename);
-void DrawYamahaSettings(LiquidCrystal* lcd);
+void ScrollFileNameLCD(LiquidCrystal *lcd);
+void DrawMainMenu(LiquidCrystal *lcd, bool SDok, char *filename);
+void DrawYamahaSettings(LiquidCrystal *lcd);
 
 #endif

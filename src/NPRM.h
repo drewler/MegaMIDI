@@ -3,9 +3,8 @@
 
 struct NPRM
 {
-    unsigned short parameter;
-    unsigned short value;
+  unsigned short parameter;
+  unsigned short value;
 };
-
 
 #endif
