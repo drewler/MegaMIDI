@@ -114,8 +114,23 @@ void SN76489::SetNoiseOff(uint8_t key)
         UpdateAttenuation(noise);
 }
 
+void SN76489::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled)
+{
+    uint8_t offset = slot % MAX_CHANNELS_PSG;
+    channels[offset].keyOn = true;
+    channels[offset].keyNumber = key;
+    channels[offset].sustained = false;
+    UpdateSquarePitch(offset);
+}
 
-void SN76489::SetChannelOn(uint8_t key, uint8_t velocity, bool velocityEnabled)
+void SN76489::SetChannelOff(uint8_t key, uint8_t slot)
+{
+    uint8_t offset = slot % MAX_CHANNELS_PSG;
+    channels[offset].keyOn = false;
+    UpdateAttenuation(offset);
+}
+
+void SN76489::SetChannelOnOld(uint8_t key, uint8_t velocity, bool velocityEnabled)
 {
     bool updateAttenuationFlag;
     uint8_t channel = 0xFF;
@@ -190,7 +205,7 @@ void SN76489::UpdateAttenuation(uint8_t voice)
     send(0x80 | attenuationRegister[voice] | attenuationValue);
 }
 
-void SN76489::SetChannelOff(uint8_t key)
+void SN76489::SetChannelOffOld(uint8_t key)
 {
     uint8_t channel = 0xFF;
     for(int i = 0; i<MAX_CHANNELS_PSG; i++)
@@ -219,7 +234,7 @@ void SN76489::ReleaseSustainedKeys()
         if(channels[i].sustained && channels[i].keyOn)
         {
             channels[i].sustained = false;
-            SetChannelOff(channels[i].keyNumber);
+            SetChannelOffOld(channels[i].keyNumber);
         }
     }
 }

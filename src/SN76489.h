@@ -27,8 +27,10 @@ public:
     SN76489();
     Channel channels[MAX_CHANNELS_PSG];
     Channel noiseChannel;
-    void SetChannelOn(uint8_t key, uint8_t velocity, bool velocityEnabled);
-    void SetChannelOff(uint8_t key);
+    void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled);
+    void SetChannelOnOld(uint8_t key, uint8_t velocity, bool velocityEnabled);
+    void SetChannelOff(uint8_t key, uint8_t slot);
+    void SetChannelOffOld(uint8_t key);
     void SetNoiseOn(uint8_t key, uint8_t velocity, bool velocityEnabled);
     void MIDISetNoiseControl(byte control, byte value);
     bool UpdateNoiseControl();
