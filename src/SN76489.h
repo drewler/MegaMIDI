@@ -1,22 +1,19 @@
 #ifndef SN76489_H_
 #define SN76489_H_
+
 #include <Arduino.h>
-#include "Adjustments.h"
+
+#include "Definitions.h"
+
+#define MAX_CHANNELS_PSG 3
 
 //SN76489 MIDI driver example by: https://github.com/cdodd/teensy-sn76489-midi-synth/blob/master/teensy-sn76489-midi-synth.ino
-const int MAX_CHANNELS_PSG = 3;
 const int noise = 3;
 
 class SN76489
 {
 private:
   uint8_t _WE = 36;
-  typedef struct
-  {
-    bool keyOn = false;
-    bool sustained = false;
-    uint8_t keyNumber = 0;
-  } Channel;
   const long clockHz = 4000000;
   const uint8_t attenuationRegister[4] = {0x10, 0x30, 0x50, 0x70};
   const uint8_t frequencyRegister[3] = {0x00, 0x20, 0x40};
@@ -26,13 +23,14 @@ private:
 
 public:
   SN76489();
-  Channel channels[MAX_CHANNELS_PSG];
-  Channel noiseChannel;
+  SNSlot slots[MAX_CHANNELS_PSG];
+  OperationMode mode;
+  bool sustainEnabled = false;
   void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled);
-  void SetChannelOnOld(uint8_t key, uint8_t velocity, bool velocityEnabled);
   void SetChannelOff(uint8_t key, uint8_t slot);
-  void SetChannelOffOld(uint8_t key);
   void SetNoiseOn(uint8_t key, uint8_t velocity, bool velocityEnabled);
+  void ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t direction);
+
   void MIDISetNoiseControl(byte control, byte value);
   bool UpdateNoiseControl();
   void SetNoiseOff(uint8_t key);
@@ -45,6 +43,7 @@ public:
   void Reset();
   void send(uint8_t data);
 };
+
 #endif
 
 //Notes

@@ -2,90 +2,80 @@
 
 YM2612::YM2612()
 {
+  mode = UNIFIED_MODE;
   DDRF = 0xFF;
   PORTF = 0x00;
   DDRC = 0xFF;
-  PORTC |= 0x3C;                  //_A1 LOW, _A0 LOW, _IC HIGH, _WR HIGH, _RD HIGH, _CS HIGH
-  memset(bank0, 0, sizeof bank0); //Reset shadow registers
+  PORTC |= 0x3C;                  // _A1 LOW, _A0 LOW, _IC HIGH, _WR HIGH, _RD HIGH, _CS HIGH
+  memset(bank0, 0, sizeof bank0); // Reset shadow registers
   memset(bank1, 0, sizeof bank1);
+  for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
+  {
+    slots[i].index = i;
+  }
+}
+
+void YM2612::ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t direction)
+{
+  YamahaSlot slotBuffer;
+  switch (parameter)
+  {
+  case VOICE_INDEX:
+    if (direction == NEXT)
+      slots[slotIndex].voiceIndex++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].voiceIndex--;
+    slots[slotIndex].voiceIndex = min(slots[slotIndex].voiceIndex, maxValidVoices);
+    slots[slotIndex].voiceIndex = max(slots[slotIndex].voiceIndex, 0);
+    break;
+  case MIDI_CHANNEL:
+    if (direction == NEXT)
+      slots[slotIndex].midiChannel++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].midiChannel--;
+    slots[slotIndex].midiChannel = min(slots[slotIndex].midiChannel, 16);
+    slots[slotIndex].midiChannel = max(slots[slotIndex].midiChannel, 1);
+    break;
+  case OCTAVE_SHIFT:
+    if (direction == NEXT)
+      slots[slotIndex].octaveShift++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].octaveShift--;
+    slots[slotIndex].octaveShift = min(slots[slotIndex].octaveShift, OCTAVE_SHIFT_RANGE);
+    slots[slotIndex].octaveShift = max(slots[slotIndex].octaveShift, -OCTAVE_SHIFT_RANGE);
+    break;
+  case TRANSPOSE_SHIFT:
+    if (direction == NEXT)
+      slots[slotIndex].transposeShift++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].transposeShift--;
+    slots[slotIndex].transposeShift = min(slots[slotIndex].transposeShift, TRANSPOSE_SHIFT_RANGE);
+    slots[slotIndex].transposeShift = max(slots[slotIndex].transposeShift, -TRANSPOSE_SHIFT_RANGE);
+    break;
+  }
+  if (mode == UNIFIED_MODE)
+  {
+    memcpy(&slotBuffer, &slots[slotIndex], sizeof(YamahaSlot));
+    for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
+    {
+      memcpy(&slots[i], &slotBuffer, sizeof(YamahaSlot));
+    }
+  }
 }
 
 void YM2612::Reset()
 {
-  digitalWriteFast(_IC, LOW); //_IC HIGH
+  digitalWriteFast(_IC, LOW); // _IC HIGH
   delayMicroseconds(25);
-  digitalWriteFast(_IC, HIGH); //_IC HIGH
+  digitalWriteFast(_IC, HIGH); // _IC HIGH
   delayMicroseconds(25);
-  memset(bank0, 0, sizeof bank0); //Reset shadow registers
+  memset(bank0, 0, sizeof bank0); // Reset shadow registers
   memset(bank1, 0, sizeof bank1);
-}
-
-void YM2612::DumpShadowRegisters()
-{
-  int line = 0x21;
-  Serial.println("--------GLOBAL BANK--------");
-  for (int i = 0; i < 0x30 - 0x21; i++)
-  {
-    if (i % 8 == 0)
-    {
-      if (i != 0)
-        Serial.println();
-      Serial.print("0x");
-      Serial.print(line, HEX);
-      Serial.print(": ");
-      line += 8;
-    }
-    if (bank0[i] < 16)
-      Serial.print("0");
-    Serial.print(bank0[i], HEX);
-    Serial.print(" ");
-  }
-  Serial.println();
-  Serial.println();
-
-  line = 0x30;
-  Serial.println("--------BANK 0--------");
-  for (int i = 0; i < 0xB7 - 0x30; i++)
-  {
-    if (i % 8 == 0)
-    {
-      Serial.println();
-      Serial.print("0x");
-      Serial.print(line, HEX);
-      Serial.print(": ");
-      line += 8;
-    }
-    if (bank0[i + 0x0F] < 16)
-      Serial.print("0");
-    Serial.print(bank0[i + 0x0F], HEX);
-    Serial.print(" ");
-  }
-  Serial.println();
-  Serial.println();
-
-  line = 0x30;
-  Serial.println("--------BANK 1--------");
-  for (int i = 0; i < 0xB7 - 0x30; i++)
-  {
-    if (i % 8 == 0)
-    {
-      if (i != 0)
-        Serial.println();
-      Serial.print("0x");
-      Serial.print(line, HEX);
-      Serial.print(": ");
-      line += 8;
-    }
-    if (bank1[i] < 16)
-      Serial.print("0");
-    Serial.print(bank1[i], HEX);
-    Serial.print(" ");
-  }
 }
 
 void YM2612::send(unsigned char addr, unsigned char data, bool setA1)
 {
-  //Store in shadow registers to keep track of written values
+  // Store in shadow registers to keep track of written values
   if (setA1)
   {
     bank1[addr - 0x30] = data;
@@ -125,16 +115,6 @@ void YM2612::SetFrequency(uint16_t frequency, uint8_t channel)
   }
   frq = (uint16_t)frequency;
   bool setA1 = channel > 2;
-
-  // unsigned char f1 = ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3);
-  // unsigned char f2 = frq;
-  // Serial.println("-------");
-  // Serial.print("0xA4: "); Serial.println(f1, HEX);
-  // Serial.print("0xA0: "); Serial.println(f2, HEX);
-  // Serial.print("A1 SET: "); Serial.println(setA1 ? "TRUE" : "FALSE");
-  // Serial.println(0xA4+channel%3, HEX);
-  // Serial.println("-------");
-
   send(0xA4 + channel % 3, ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3), setA1);
   send(0xA0 + channel % 3, frq, setA1);
 }
@@ -161,124 +141,11 @@ void YM2612::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velo
 {
   uint8_t offset = slot % MAX_CHANNELS_YM;
   bool setA1 = false; // ???
-  channels[offset].keyOn = true;
-  channels[offset].keyNumber = key;
-  channels[offset].blockNumber = key / 12;
-  channels[offset].sustained = false;
-  channels[offset].index = offset;
+  slots[offset].status.keyOn = true;
+  slots[offset].status.keyNumber = key;
+  slots[offset].status.sustained = false;
   send(0x28, 0xF0 + offset + (setA1 << 2));
   SetFrequency(NoteToFrequency(key), offset);
-}
-
-uint8_t chIndex = 0;
-void YM2612::SetChannelOnOld(uint8_t key, uint8_t velocity, bool velocityEnabled)
-{
-  uint8_t openChannel = 0xFF;
-  for (int i = 0; i < MAX_CHANNELS_YM; i++)
-  {
-    if (!channels[i].keyOn || channels[i].keyNumber == key)
-    {
-      if (channels[i].keyNumber == key && channels[i].sustained)
-      {
-        //Turn off the sustained channel before turning it back on again
-        uint8_t offset = i % 3;
-        bool setA1 = i > 2;
-        send(0x28, 0x00 + offset + (setA1 << 2));
-      }
-      channels[i].keyOn = true;
-      channels[i].keyNumber = key;
-      channels[i].blockNumber = key / 12;
-      channels[i].sustained = YMsustainEnabled;
-      channels[i].index = chIndex;
-      openChannel = i;
-      break;
-    }
-  }
-  uint8_t highestIndex = 0xFF;
-  if (openChannel == 0xFF) //All channels full, kill the oldest note
-  {
-    for (int i = 0; i < MAX_CHANNELS_YM; i++)
-    {
-      if (channels[i].index < highestIndex)
-        highestIndex = channels[i].index;
-    }
-    uint8_t offset = highestIndex % 3;
-    bool setA1 = highestIndex > 2;
-    send(0x28, 0x00 + offset + (setA1 << 2));
-    channels[highestIndex].keyOn = true;
-    channels[highestIndex].keyNumber = key;
-    channels[highestIndex].blockNumber = key / 12;
-    channels[highestIndex].sustained = YMsustainEnabled;
-    channels[highestIndex].index = chIndex;
-    openChannel = highestIndex;
-  }
-  chIndex++;
-  chIndex %= MAX_CHANNELS_YM;
-
-  uint8_t offset = openChannel % 3;
-  bool setA1 = openChannel > 2;
-
-  if (pitchBendYM == 0)
-  {
-    SetFrequency(NoteToFrequency(key), openChannel);
-  }
-  else
-  {
-    float freqFrom = NoteToFrequency(key - pitchBendYMRange);
-    float freqTo = NoteToFrequency(key + pitchBendYMRange);
-    SetFrequency(map(pitchBendYM, -8192, 8192, freqFrom, freqTo), openChannel);
-  }
-  if (velocityEnabled)
-  {
-    uint8_t s_FBALGO = GetShadowValue(0xB0, 0);
-    uint8_t algo = 0b00000111 & s_FBALGO;
-    uint8_t fb = 0b00111000 & s_FBALGO;
-    velocity = 127 - velocity;
-    for (int a1 = 0; a1 <= 1; a1++)
-    {
-      for (int i = 0; i < 3; i++)
-      {
-        switch (algo)
-        {
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-        {
-          //Algos 0-3 all use OP.4 as the "slot" (AKA output or carrier)
-          send(0x4C + i, velocity, a1);
-          break;
-        }
-        case 4:
-        {
-          //OP.2 & OP.4
-          send(0x44 + i, velocity, a1);
-          send(0x4C + i, velocity, a1);
-          break;
-        }
-        case 5:
-        case 6:
-        {
-          //Algos 5-6 use OP.2 & OP.3 & OP.4
-          send(0x44 + i, velocity, a1);
-          send(0x48 + i, velocity, a1);
-          send(0x4C + i, velocity, a1);
-          break;
-        }
-        case 7:
-        {
-          //This algo uses every operator as a slot
-          send(0x40 + i, velocity, a1);
-          send(0x44 + i, velocity, a1);
-          send(0x48 + i, velocity, a1);
-          send(0x4C + i, velocity, a1);
-          break;
-        }
-        }
-      }
-    }
-  }
-  send(0x28, 0xF0 + offset + (setA1 << 2));
 }
 
 uint8_t YM2612::GetShadowValue(uint8_t addr, bool bank)
@@ -289,29 +156,8 @@ uint8_t YM2612::GetShadowValue(uint8_t addr, bool bank)
 void YM2612::SetChannelOff(uint8_t key, uint8_t slot)
 {
   uint8_t offset = slot % MAX_CHANNELS_YM;
-  channels[offset].keyOn = false;
+  slots[offset].status.keyOn = false;
   bool setA1 = false; // ???
-  send(0x28, 0x00 + offset + (setA1 << 2));
-}
-
-void YM2612::SetChannelOffOld(uint8_t key)
-{
-  uint8_t closedChannel = 0xFF;
-  for (int i = 0; i < MAX_CHANNELS_YM; i++)
-  {
-    if (channels[i].keyNumber == key)
-    {
-      if (channels[i].sustained)
-        continue;
-      channels[i].keyOn = false;
-      closedChannel = i;
-      break;
-    }
-  }
-  if (closedChannel == 0xFF)
-    return;
-  uint8_t offset = closedChannel % 3;
-  bool setA1 = closedChannel > 2;
   send(0x28, 0x00 + offset + (setA1 << 2));
 }
 
@@ -319,10 +165,10 @@ void YM2612::ReleaseSustainedKeys()
 {
   for (int i = 0; i < MAX_CHANNELS_YM; i++)
   {
-    if (channels[i].sustained && channels[i].keyOn)
+    if (slots[i].status.sustained && slots[i].status.keyOn)
     {
-      channels[i].sustained = false;
-      SetChannelOff(channels[i].keyNumber, i);
+      slots[i].status.sustained = false;
+      SetChannelOff(slots[i].status.keyNumber, i);
     }
   }
 }
@@ -331,101 +177,15 @@ void YM2612::ClampSustainedKeys()
 {
   for (int i = 0; i < MAX_CHANNELS_YM; i++)
   {
-    if (!channels[i].sustained && channels[i].keyOn)
+    if (!slots[i].status.sustained && slots[i].status.keyOn)
     {
-      channels[i].sustained = true;
+      slots[i].status.sustained = true;
     }
   }
 }
 
 void YM2612::SetVoiceManual(uint8_t slot, Voice v)
 {
-  //   currentVoice = v;
-  // bool resetLFO = lfoOn;
-  // if(lfoOn)
-  //   ToggleLFO();
-  // send(0x22, 0x00); // LFO off
-  // send(0x27, 0x00); // CH3 Normal
-  // send(0x28, 0x00); // Turn off all channels
-  // send(0x2B, 0x00); // DAC off
-
-  // for(int a1 = 0; a1<=1; a1++)
-  // {
-  //   for(int i=0; i<3; i++)
-  //   {
-  //         uint8_t DT1MUL, TL, RSAR, AMD1R, D2R, D1LRR = 0;
-
-  //         //Operator 1
-  //         DT1MUL = (v.M1[8] << 4) | v.M1[7];
-  //         TL = v.M1[5];
-  //         RSAR = (v.M1[6] << 6) | v.M1[0];
-  //         AMD1R = (v.M1[10] << 7) | v.M1[1];
-  //         D2R = v.M1[2];
-  //         D1LRR = (v.M1[4] << 4) | v.M1[3];
-
-  //         send(0x30 + i, DT1MUL, a1); //DT1/Mul
-  //         send(0x40 + i, TL, a1); //Total Level
-  //         send(0x50 + i, RSAR, a1); //RS/AR
-  //         send(0x60 + i, AMD1R, a1); //AM/D1R
-  //         send(0x70 + i, D2R, a1); //D2R
-  //         send(0x80 + i, D1LRR, a1); //D1L/RR
-  //         send(0x90 + i, 0x00, a1); //SSG EG
-
-  //         //Operator 2
-  //         DT1MUL = (v.C1[8] << 4) | v.C1[7];
-  //         TL = v.C1[5];
-  //         RSAR = (v.C1[6] << 6) | v.C1[0];
-  //         AMD1R = (v.C1[10] << 7) | v.C1[1];
-  //         D2R = v.C1[2];
-  //         D1LRR = (v.C1[4] << 4) | v.C1[3];
-  //         send(0x34 + i, DT1MUL, a1); //DT1/Mul
-  //         send(0x44 + i, TL, a1); //Total Level
-  //         send(0x54 + i, RSAR, a1); //RS/AR
-  //         send(0x64 + i, AMD1R, a1); //AM/D1R
-  //         send(0x74 + i, D2R, a1); //D2R
-  //         send(0x84 + i, D1LRR, a1); //D1L/RR
-  //         send(0x94 + i, 0x00, a1); //SSG EG
-
-  //         //Operator 3
-  //         DT1MUL = (v.M2[8] << 4) | v.M2[7];
-  //         TL = v.M2[5];
-  //         RSAR = (v.M2[6] << 6) | v.M2[0];
-  //         AMD1R = (v.M2[10] << 7) | v.M2[1];
-  //         D2R = v.M2[2];
-  //         D1LRR = (v.M2[4] << 4) | v.M2[3];
-  //         send(0x38 + i, DT1MUL, a1); //DT1/Mul
-  //         send(0x48 + i, TL, a1); //Total Level
-  //         send(0x58 + i, RSAR, a1); //RS/AR
-  //         send(0x68 + i, AMD1R, a1); //AM/D1R
-  //         send(0x78 + i, D2R, a1); //D2R
-  //         send(0x88 + i, D1LRR, a1); //D1L/RR
-  //         send(0x98 + i, 0x00, a1); //SSG EG
-
-  //         //Operator 4
-  //         DT1MUL = (v.C2[8] << 4) | v.C2[7];
-  //         TL = v.C2[5];
-  //         RSAR = (v.C2[6] << 6) | v.C2[0];
-  //         AMD1R = (v.C2[10] << 7) | v.C2[1];
-  //         D2R = v.C2[2];
-  //         D1LRR = (v.C2[4] << 4) | v.C2[3];
-  //         send(0x3C + i, DT1MUL, a1); //DT1/Mul
-  //         send(0x4C + i, TL, a1); //Total Level
-  //         send(0x5C + i, RSAR, a1); //RS/AR
-  //         send(0x6C + i, AMD1R, a1); //AM/D1R
-  //         send(0x7C + i, D2R, a1); //D2R
-  //         send(0x8C + i, D1LRR, a1); //D1L/RR
-  //         send(0x9C + i, 0x00, a1); //SSG EG
-
-  //         uint8_t FBALGO = (v.CH[1] << 3) | v.CH[2];
-  //         send(0xB0 + i, FBALGO, a1); // Ch FB/Algo
-  //         send(0xB4 + i, 0xC0, a1); // Both Spks on
-
-  //         send(0x28, 0x00 + i + (a1 << 2)); //Keys off
-  //   }
-  // }
-  // if(resetLFO)
-  //   ToggleLFO();
-
   SetFMFeedback(slot, v.CH[1]);
   SetAlgo(slot, v.CH[2]);
   SetAMSens(slot, v.CH[3]);
@@ -493,7 +253,7 @@ void YM2612::SetVoice(Voice v)
     {
       uint8_t DT1MUL, TL, RSAR, AMD1R, D2R, D1LRR = 0;
 
-      //Operator 1
+      // Operator 1
       DT1MUL = (v.M1[8] << 4) | v.M1[7];
       TL = v.M1[5];
       RSAR = (v.M1[6] << 6) | v.M1[0];
@@ -501,68 +261,45 @@ void YM2612::SetVoice(Voice v)
       D2R = v.M1[2];
       D1LRR = (v.M1[4] << 4) | v.M1[3];
 
-      // if(i == 0 && a1 == 0)
-      // {
-      // Serial.println("-----OPERATOR 1, A0-----");
-      // Serial.print("DT1MUL: "); Serial.println(DT1MUL, HEX);
-      // Serial.print("TL: "); Serial.println(TL, HEX);
-      // Serial.print("RSAR: "); Serial.println(RSAR, HEX);
-      // Serial.print("AMD1R: "); Serial.println(AMD1R, HEX);
-      // Serial.print("D2R: "); Serial.println(D2R, HEX);
-      // Serial.print("D1LRR: "); Serial.println(D1LRR, HEX);
-      // }
+      send(0x30 + i, DT1MUL, a1); // DT1/Mul
+      send(0x40 + i, TL, a1);     // Total Level
+      send(0x50 + i, RSAR, a1);   // RS/AR
+      send(0x60 + i, AMD1R, a1);  // AM/D1R
+      send(0x70 + i, D2R, a1);    // D2R
+      send(0x80 + i, D1LRR, a1);  // D1L/RR
+      send(0x90 + i, 0x00, a1);   // SSG EG
 
-      // Serial.println();
-      // if(i == 0 && a1 == 1)
-      // {
-      // Serial.println("-----OPERATOR 1, A1-----");
-      // Serial.print("DT1MUL: "); Serial.println(DT1MUL, HEX);
-      // Serial.print("TL: "); Serial.println(TL, HEX);
-      // Serial.print("RSAR: "); Serial.println(RSAR, HEX);
-      // Serial.print("AMD1R: "); Serial.println(AMD1R, HEX);
-      // Serial.print("D2R: "); Serial.println(D2R, HEX);
-      // Serial.print("D1LRR: "); Serial.println(D1LRR, HEX);
-      // }
-
-      send(0x30 + i, DT1MUL, a1); //DT1/Mul
-      send(0x40 + i, TL, a1);     //Total Level
-      send(0x50 + i, RSAR, a1);   //RS/AR
-      send(0x60 + i, AMD1R, a1);  //AM/D1R
-      send(0x70 + i, D2R, a1);    //D2R
-      send(0x80 + i, D1LRR, a1);  //D1L/RR
-      send(0x90 + i, 0x00, a1);   //SSG EG
-
-      //Operator 2
+      // Operator 2
       DT1MUL = (v.C1[8] << 4) | v.C1[7];
       TL = v.C1[5];
       RSAR = (v.C1[6] << 6) | v.C1[0];
       AMD1R = (v.C1[10] << 7) | v.C1[1];
       D2R = v.C1[2];
       D1LRR = (v.C1[4] << 4) | v.C1[3];
-      send(0x34 + i, DT1MUL, a1); //DT1/Mul
-      send(0x44 + i, TL, a1);     //Total Level
-      send(0x54 + i, RSAR, a1);   //RS/AR
-      send(0x64 + i, AMD1R, a1);  //AM/D1R
-      send(0x74 + i, D2R, a1);    //D2R
-      send(0x84 + i, D1LRR, a1);  //D1L/RR
-      send(0x94 + i, 0x00, a1);   //SSG EG
+      send(0x34 + i, DT1MUL, a1); // DT1/Mul
+      send(0x44 + i, TL, a1);     // Total Level
+      send(0x54 + i, RSAR, a1);   // RS/AR
+      send(0x64 + i, AMD1R, a1);  // AM/D1R
+      send(0x74 + i, D2R, a1);    // D2R
+      send(0x84 + i, D1LRR, a1);  // D1L/RR
+      send(0x94 + i, 0x00, a1);   // SSG EG
 
-      //Operator 3
+      // Operator 3
       DT1MUL = (v.M2[8] << 4) | v.M2[7];
       TL = v.M2[5];
       RSAR = (v.M2[6] << 6) | v.M2[0];
       AMD1R = (v.M2[10] << 7) | v.M2[1];
       D2R = v.M2[2];
       D1LRR = (v.M2[4] << 4) | v.M2[3];
-      send(0x38 + i, DT1MUL, a1); //DT1/Mul
-      send(0x48 + i, TL, a1);     //Total Level
-      send(0x58 + i, RSAR, a1);   //RS/AR
-      send(0x68 + i, AMD1R, a1);  //AM/D1R
-      send(0x78 + i, D2R, a1);    //D2R
-      send(0x88 + i, D1LRR, a1);  //D1L/RR
-      send(0x98 + i, 0x00, a1);   //SSG EG
+      send(0x38 + i, DT1MUL, a1); // DT1/Mul
+      send(0x48 + i, TL, a1);     // Total Level
+      send(0x58 + i, RSAR, a1);   // RS/AR
+      send(0x68 + i, AMD1R, a1);  // AM/D1R
+      send(0x78 + i, D2R, a1);    // D2R
+      send(0x88 + i, D1LRR, a1);  // D1L/RR
+      send(0x98 + i, 0x00, a1);   // SSG EG
 
-      //Operator 4
+      // Operator 4
       DT1MUL = (v.C2[8] << 4) | v.C2[7];
       TL = v.C2[5];
       RSAR = (v.C2[6] << 6) | v.C2[0];
@@ -614,8 +351,8 @@ void YM2612::AdjustLFO(uint8_t value)
 
 void YM2612::AdjustPitch(uint8_t channel, int pitch)
 {
-  float freqFrom = NoteToFrequency(channels[channel].keyNumber - pitchBendYMRange);
-  float freqTo = NoteToFrequency(channels[channel].keyNumber + pitchBendYMRange);
+  float freqFrom = NoteToFrequency(slots[channel].status.keyNumber - pitchBendYMRange);
+  float freqTo = NoteToFrequency(slots[channel].status.keyNumber + pitchBendYMRange);
   pitchBendYM = pitch;
   SetFrequency(map(pitch, -8192, 8192, freqFrom, freqTo), channel);
 }
@@ -636,22 +373,22 @@ void YM2612::ToggleLFO()
     {
       for (int i = 0; i < 3; i++)
       {
-        //Op. 1
+        // Op. 1
         AMD1R = (v.M1[10] << 7) | v.M1[1];
         AMD1R |= 1 << 7;
         send(0x60 + i, AMD1R, a1);
 
-        //Op. 2
+        // Op. 2
         AMD1R = (v.C1[10] << 7) | v.C1[1];
         AMD1R |= 1 << 7;
         send(0x64 + i, AMD1R, a1);
 
-        //Op. 3
+        // Op. 3
         AMD1R = (v.M2[10] << 7) | v.M2[1];
         AMD1R |= 1 << 7;
         send(0x68 + i, AMD1R, a1);
 
-        //Op. 4
+        // Op. 4
         AMD1R = (v.C2[10] << 7) | v.C2[1];
         AMD1R |= 1 << 7;
         send(0x6C + i, AMD1R, a1);
@@ -669,44 +406,10 @@ void YM2612::ToggleLFO()
     delay(1);
     SetVoice(v);
   }
-  digitalWriteFast(leds[0], lfoOn);
+  // digitalWriteFast(leds[0], lfoOn);
 }
 
-void YM2612::SetOctaveShift(int8_t shift)
-{
-  octaveShift = shift;
-}
-
-int8_t YM2612::GetOctaveShift()
-{
-  return octaveShift;
-}
-
-void YM2612::ShiftOctaveUp()
-{
-  if (octaveShift == MAX_OCTAVE_SHIFT)
-    return;
-  octaveShift++;
-  Serial.print("Octave Shift Up: ");
-  Serial.print(octaveShift);
-}
-
-void YM2612::ShiftOctaveDown()
-{
-  if (octaveShift == -MAX_OCTAVE_SHIFT)
-    return;
-  octaveShift--;
-  Serial.print("Octave Shift Down: ");
-  Serial.print(octaveShift);
-}
-
-uint16_t YM2612::CalcFNumber(float note)
-{
-  const uint32_t clockFrq = 8000000;
-  return (144 * note * (pow(2, 20)) / clockFrq) / pow(2, 4 - 1);
-}
-
-//DRY OMEGALUL
+// DRY OMEGALUL
 void YM2612::SetTL(uint8_t slot, uint8_t op, uint8_t value)
 {
   bool a1 = (slot > 2);
@@ -724,7 +427,7 @@ void YM2612::SetAR(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x50 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b11100000; //Mask RS
+  data &= 0b11100000; // Mask RS
   data |= value;
   send(addr, data, a1);
 }
@@ -738,7 +441,7 @@ void YM2612::SetD1R(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x60 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b10000000; //Mask AM
+  data &= 0b10000000; // Mask AM
   data |= value;
   send(addr, data, a1);
 }
@@ -752,7 +455,7 @@ void YM2612::SetD1L(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x80 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b00001111; //Mask RR
+  data &= 0b00001111; // Mask RR
   data |= value << 4;
   send(addr, data, a1);
 }
@@ -774,7 +477,7 @@ void YM2612::SetRR(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x80 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b11110000; //Mask D1L
+  data &= 0b11110000; // Mask D1L
   data |= value;
   send(addr, data, a1);
 }
@@ -788,7 +491,7 @@ void YM2612::SetDetune(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x30 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b00001111; //Mask MUL
+  data &= 0b00001111; // Mask MUL
   data |= value << 4;
   send(addr, data, a1);
 }
@@ -802,7 +505,7 @@ void YM2612::SetMult(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x30 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b01110000; //Mask DT1
+  data &= 0b01110000; // Mask DT1
   data |= value;
   send(addr, data, a1);
 }
@@ -816,7 +519,7 @@ void YM2612::SetRateScaling(uint8_t slot, uint8_t op, uint8_t value)
   uint8_t addr = (0x50 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b00011111; //Mask AR
+  data &= 0b00011111; // Mask AR
   data |= value << 6;
   send(addr, data, a1);
 }
@@ -828,7 +531,7 @@ void YM2612::SetAmplitudeModulation(uint8_t slot, uint8_t op, bool value)
   uint8_t addr = (0x60 + (0x04 * op)) + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b01111111; //Mask AR
+  data &= 0b01111111; // Mask AR
   data |= value << 7;
   send(addr, data, a1);
 }
@@ -844,7 +547,7 @@ void YM2612::SetLFOEnabled(bool value)
 void YM2612::SetLFOFreq(bool value)
 {
   uint8_t data = GetShadowValue(0x22, 0);
-  data &= 0b11111000; //Mask LFOEnable
+  data &= 0b11111000; // Mask LFOEnable
   data |= value;
   send(0x22, data, false);
 }
@@ -858,7 +561,7 @@ void YM2612::SetFreqModSens(uint8_t slot, uint8_t value)
   uint8_t addr = 0xB4 + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b11111000; //Mask L_R_AMS
+  data &= 0b11111000; // Mask L_R_AMS
   data |= value;
   send(addr, data, a1);
 }
@@ -872,9 +575,9 @@ void YM2612::SetAMSens(uint8_t slot, uint8_t value)
   uint8_t addr = 0xB4 + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b11000111; //Mask L_R_FMS
+  data &= 0b11000111; // Mask L_R_FMS
   data |= value << 3;
-  data |= 0b11000000; //Set L_R to true for now
+  data |= 0b11000000; // Set L_R to true for now
   send(addr, data, a1);
 }
 
@@ -887,7 +590,7 @@ void YM2612::SetAlgo(uint8_t slot, uint8_t value)
   uint8_t addr = 0xB0 + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b11111000; //Mask feedback
+  data &= 0b11111000; // Mask feedback
   data |= value;
   send(addr, data, a1);
 }
@@ -901,7 +604,7 @@ void YM2612::SetFMFeedback(uint8_t slot, uint8_t value)
   uint8_t addr = 0xB0 + slot;
   uint8_t data = GetShadowValue(addr, a1);
 
-  data &= 0b11000111; //Mask Algo
+  data &= 0b11000111; // Mask Algo
   data |= value << 3;
   send(addr, data, a1);
 }
@@ -914,103 +617,3 @@ void YM2612::SetFMFeedback(uint8_t slot, uint8_t value)
 // RD = PC3/13
 // A0 = PC4/14
 // A1 = PC5/15
-
-//TEST PIANO VOICE
-// for(int a1 = 0; a1<=1; a1++)
-// {
-//   for(int i=0; i<3; i++)
-//   {
-//         uint8_t DT1MUL, TL, RSAR, AMD1R, D2R, D1LRR = 0;
-
-//         //Operator 1
-//         DT1MUL = (v.M1[8] << 4) | v.M1[7];
-//         TL = v.M1[5];
-//         RSAR = (v.M1[6] << 6) | v.M1[0];
-//         AMD1R = (v.M1[10] << 7) | v.M1[1];
-//         D2R = v.M1[2];
-//         D1LRR = (v.M1[4] << 4) | v.M1[3];
-
-//         // if(i == 0 && a1 == 0)
-//         // {
-//         // Serial.println("OPERATOR 1, A0");
-//         // Serial.print("DT1MUL: "); Serial.println(DT1MUL, HEX);
-//         // Serial.print("TL: "); Serial.println(TL, HEX);
-//         // Serial.print("RSAR: "); Serial.println(RSAR, HEX);
-//         // Serial.print("AMD1R: "); Serial.println(AMD1R, HEX);
-//         // Serial.print("D2R: "); Serial.println(D2R, HEX);
-//         // Serial.print("D1LRR: "); Serial.println(D1LRR, HEX);
-//         // }
-
-//         // if(i == 0 && a1 == 1)
-//         // {
-//         // Serial.println("OPERATOR 1, A1");
-//         // Serial.print("DT1MUL: "); Serial.println(DT1MUL, HEX);
-//         // Serial.print("TL: "); Serial.println(TL, HEX);
-//         // Serial.print("RSAR: "); Serial.println(RSAR, HEX);
-//         // Serial.print("AMD1R: "); Serial.println(AMD1R, HEX);
-//         // Serial.print("D2R: "); Serial.println(D2R, HEX);
-//         // Serial.print("D1LRR: "); Serial.println(D1LRR, HEX);
-//         // }
-
-//         send(0x30 + i, 0x71, a1); //DT1/Mul
-//         send(0x40 + i, 0x23, a1); //Total Level
-//         send(0x50 + i, 0x5F, a1); //RS/AR
-//         send(0x60 + i, 0x05, a1); //AM/D1R
-//         send(0x70 + i, 0x02, a1); //D2R
-//         send(0x80 + i, 0x11, a1); //D1L/RR
-//         send(0x90 + i, 0x00, a1); //SSG EG
-
-//         //Operator 2
-//         DT1MUL = (v.C1[8] << 4) | v.C1[7];
-//         TL = v.C1[5];
-//         RSAR = (v.C1[6] << 6) | v.C1[0];
-//         AMD1R = (v.C1[10] << 7) | v.C1[1];
-//         D2R = v.C1[2];
-//         D1LRR = (v.C1[4] << 4) | v.C1[3];
-//         send(0x34 + i, 0x0D, a1); //DT1/Mul
-//         send(0x44 + i, 0x2D, a1); //Total Level
-//         send(0x54 + i, 0x99, a1); //RS/AR
-//         send(0x64 + i, 0x05, a1); //AM/D1R
-//         send(0x74 + i, 0x02, a1); //D2R
-//         send(0x84 + i, 0x11, a1); //D1L/RR
-//         send(0x94 + i, 0x00, a1); //SSG EG
-
-//         //Operator 3
-//         DT1MUL = (v.M2[8] << 4) | v.M2[7];
-//         TL = v.M2[5];
-//         RSAR = (v.M2[6] << 6) | v.M2[0];
-//         AMD1R = (v.M2[10] << 7) | v.M2[1];
-//         D2R = v.M2[2];
-//         D1LRR = (v.M2[4] << 4) | v.M2[3];
-//         send(0x38 + i, 0x33, a1); //DT1/Mul
-//         send(0x48 + i, 0x26, a1); //Total Level
-//         send(0x58 + i, 0x5F, a1); //RS/AR
-//         send(0x68 + i, 0x05, a1); //AM/D1R
-//         send(0x78 + i, 0x02, a1); //D2R
-//         send(0x88 + i, 0x11, a1); //D1L/RR
-//         send(0x98 + i, 0x00, a1); //SSG EG
-
-//         //Operator 4
-//         DT1MUL = (v.C2[8] << 4) | v.C2[7];
-//         TL = v.C2[5];
-//         RSAR = (v.C2[6] << 6) | v.C2[0];
-//         AMD1R = (v.C2[10] << 7) | v.C2[1];
-//         D2R = v.C2[2];
-//         D1LRR = (v.C2[4] << 4) | v.C2[3];
-//         send(0x3C + i, 0x01, a1); //DT1/Mul
-//         send(0x4C + i, 0x00, a1); //Total Level
-//         send(0x5C + i, 0x94, a1); //RS/AR
-//         send(0x6C + i, 0x07, a1); //AM/D1R
-//         send(0x7C + i, 0x02, a1); //D2R
-//         send(0x8C + i, 0xA6, a1); //D1L/RR
-//         send(0x9C + i, 0x00, a1); //SSG EG
-
-//         uint8_t FBALGO = (v.CH[1] << 3) | v.CH[2];
-//         send(0xB0 + i, 0x32); // Ch FB/Algo
-//         send(0xB4 + i, 0xC0); // Both Spks on
-
-//         send(0x28, 0x00 + i + (a1 << 2)); //Keys off
-//   }
-// }
-// if(resetLFO)
-//   ToggleLFO();

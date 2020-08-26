@@ -4,10 +4,15 @@
 
 SN76489::SN76489()
 {
+  mode = UNIFIED_MODE;
   DDRF = 0xFF;
   PORTF = 0x00;
   pinMode(_WE, OUTPUT);
   digitalWriteFast(_WE, HIGH);
+  for (uint8_t i = 0; i < MAX_CHANNELS_PSG; i++)
+  {
+    slots[i].index = i;
+  }
 }
 
 void SN76489::Reset()
@@ -16,6 +21,49 @@ void SN76489::Reset()
   send(0xBF);
   send(0xDF);
   send(0xFF);
+}
+
+void SN76489::ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t direction)
+{
+  SNSlot slotBuffer;
+  switch (parameter)
+  {
+  case NOISE:
+    // TODO
+    break;
+  case MIDI_CHANNEL:
+    if (direction == NEXT)
+      slots[slotIndex].midiChannel++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].midiChannel--;
+    slots[slotIndex].midiChannel = min(slots[slotIndex].midiChannel, 16);
+    slots[slotIndex].midiChannel = max(slots[slotIndex].midiChannel, 1);
+    break;
+  case OCTAVE_SHIFT:
+    if (direction == NEXT)
+      slots[slotIndex].octaveShift++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].octaveShift--;
+    slots[slotIndex].octaveShift = min(slots[slotIndex].octaveShift, OCTAVE_SHIFT_RANGE);
+    slots[slotIndex].octaveShift = max(slots[slotIndex].octaveShift, -OCTAVE_SHIFT_RANGE);
+    break;
+  case TRANSPOSE_SHIFT:
+    if (direction == NEXT)
+      slots[slotIndex].transposeShift++;
+    if (direction == PREVIOUS)
+      slots[slotIndex].transposeShift--;
+    slots[slotIndex].transposeShift = min(slots[slotIndex].transposeShift, TRANSPOSE_SHIFT_RANGE);
+    slots[slotIndex].transposeShift = max(slots[slotIndex].transposeShift, -TRANSPOSE_SHIFT_RANGE);
+    break;
+  }
+  if (mode == UNIFIED_MODE)
+  {
+    memcpy(&slotBuffer, &slots[slotIndex], sizeof(SNSlot));
+    for (uint8_t i = 0; i < MAX_CHANNELS_PSG; i++)
+    {
+      memcpy(&slots[i], &slotBuffer, sizeof(SNSlot));
+    }
+  }
 }
 
 void SN76489::send(uint8_t data)
@@ -116,53 +164,17 @@ void SN76489::SetNoiseOff(uint8_t key)
 void SN76489::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled)
 {
   uint8_t offset = slot % MAX_CHANNELS_PSG;
-  channels[offset].keyOn = true;
-  channels[offset].keyNumber = key;
-  channels[offset].sustained = false;
+  slots[offset].status.keyOn = true;
+  slots[offset].status.keyNumber = key;
+  slots[offset].status.sustained = false;
   UpdateSquarePitch(offset);
 }
 
 void SN76489::SetChannelOff(uint8_t key, uint8_t slot)
 {
   uint8_t offset = slot % MAX_CHANNELS_PSG;
-  channels[offset].keyOn = false;
+  slots[offset].status.keyOn = false;
   UpdateAttenuation(offset);
-}
-
-void SN76489::SetChannelOnOld(uint8_t key, uint8_t velocity, bool velocityEnabled)
-{
-  bool updateAttenuationFlag;
-  uint8_t channel = 0xFF;
-  for (int i = 0; i < MAX_CHANNELS_PSG; i++)
-  {
-    if (!channels[i].keyOn || channels[i].keyNumber == key)
-    {
-      if (channels[i].keyNumber == key && channels[i].sustained)
-      {
-        currentVelocity[i] = 0;
-        UpdateAttenuation(i);
-      }
-      channels[i].keyOn = true;
-      channels[i].keyNumber = key;
-      channels[i].sustained = PSGsustainEnabled;
-      channel = i;
-      break;
-    }
-  }
-  if (channel == 0xFF)
-    return;
-
-  if (channel < MAX_CHANNELS_PSG)
-  {
-    currentNote[channel] = key;
-    if (velocityEnabled)
-      currentVelocity[channel] = velocity;
-    else
-      currentVelocity[channel] = 127;
-    updateAttenuationFlag = UpdateSquarePitch(channel);
-    if (updateAttenuationFlag)
-      UpdateAttenuation(channel);
-  }
 }
 
 void SN76489::PitchChange(uint8_t channel, int pitch)
@@ -204,36 +216,13 @@ void SN76489::UpdateAttenuation(uint8_t voice)
   send(0x80 | attenuationRegister[voice] | attenuationValue);
 }
 
-void SN76489::SetChannelOffOld(uint8_t key)
-{
-  uint8_t channel = 0xFF;
-  for (int i = 0; i < MAX_CHANNELS_PSG; i++)
-  {
-    if (channels[i].keyNumber == key)
-    {
-      if (channels[i].sustained)
-        continue;
-      channels[i].keyOn = false;
-      channel = i;
-      break;
-    }
-  }
-  if (channel == 0xFF)
-    return;
-  if (key != currentNote[channel])
-    return;
-  currentVelocity[channel] = 0;
-  UpdateAttenuation(channel);
-}
-
 void SN76489::ReleaseSustainedKeys()
 {
   for (int i = 0; i < MAX_CHANNELS_PSG; i++)
   {
-    if (channels[i].sustained && channels[i].keyOn)
+    if (slots[i].status.sustained && slots[i].status.keyOn)
     {
-      channels[i].sustained = false;
-      SetChannelOffOld(channels[i].keyNumber);
+      slots[i].status.sustained = false;
     }
   }
 }
@@ -242,9 +231,9 @@ void SN76489::ClampSustainedKeys()
 {
   for (int i = 0; i < MAX_CHANNELS_PSG; i++)
   {
-    if (!channels[i].sustained && channels[i].keyOn)
+    if (!slots[i].status.sustained && slots[i].status.keyOn)
     {
-      channels[i].sustained = true;
+      slots[i].status.sustained = true;
     }
   }
 }
