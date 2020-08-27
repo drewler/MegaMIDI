@@ -9,26 +9,31 @@ FileUtil::FileUtil()
   {
     // TODO - failed
   }
+  // Count files
+  File countFile;
+  while (countFile.openNext(SD.vwd(), O_READ))
+  {
+    countFile.close();
+    numberOfFiles++;
+  }
+  countFile.close();
+  SD.vwd()->rewind();
 }
 
 // Request a file with NEXT, PREV, FIRST commands
 bool FileUtil::LoadFile(byte strategy)
 {
+  if (numberOfFiles == 0)
+  {
+    return false;
+  }
   File nextFile;
   memset(fileName, 0x00, MAX_FILE_NAME_SIZE);
   switch (strategy)
   {
   case FIRST_FILE:
   {
-    File countFile;
-    while (countFile.openNext(SD.vwd(), O_READ))
-    {
-      countFile.close();
-      numberOfFiles++;
-    }
-    countFile.close();
     SD.vwd()->rewind();
-
     if (file.isOpen())
     {
       file.close();
@@ -40,7 +45,6 @@ bool FileUtil::LoadFile(byte strategy)
     }
     file.getName(fileName, MAX_FILE_NAME_SIZE);
     currentFileNumber = 0;
-    return true;
     break;
   }
   case NEXT_FILE:
@@ -91,6 +95,8 @@ bool FileUtil::LoadFile(byte strategy)
   file = SD.open(fileName, FILE_READ);
   if (!file)
   {
+    digitalWrite(leds[0], HIGH);
+
     // TODO
   }
   ReadVoiceData();
@@ -157,13 +163,11 @@ void FileUtil::ReadVoiceData()
       break;
   }
   if (!foundNoName)
+  {
     maxValidVoices = voiceCount;
+  }
   if (voiceCount == 0)
-  {
     isFileValid = false;
-  }
   else
-  {
     isFileValid = true;
-  }
 }

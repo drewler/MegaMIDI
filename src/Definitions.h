@@ -75,8 +75,8 @@ typedef struct
   unsigned char C2[11];
 } Voice;
 
-static Voice voices[MAX_VOICES];
-static uint8_t maxValidVoices = 0;
+extern Voice voices[MAX_VOICES];
+extern unsigned char maxValidVoices;
 
 static const unsigned char leds[] = {1, 3, 4, 5, 6, 7, 24, 27};
 

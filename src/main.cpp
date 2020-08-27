@@ -95,6 +95,14 @@ void setup()
   ui.IntroLEDs();
 
   attachInterrupt(digitalPinToInterrupt(ENC_BTN), HandleRotaryButtonDown, FALLING);
+  fileUtil.LoadFile(FIRST_FILE);
+  if (maxValidVoices > 0)
+  {
+    for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
+    {
+      ym2612.SetVoiceManual(i, voices[0]);
+    }
+  }
   ui.PushScreen(MAIN_MENU);
 }
 
@@ -118,33 +126,14 @@ void ResetSoundChips()
  */
 void KeyOn(byte channel, byte key, byte velocity)
 {
-  // by now, velocity is disabled
-  // check which slot maps to current key + channel
-  // fixme - ignore it by now
-  // current channel mapping
-  // ym => [0-5]
-  // sn => 6
-  if ((channel >= (MAX_CHANNELS_YM + 1)) && (channel <= (MAX_CHANNELS_YM + MAX_CHANNELS_PSG)))
-  {
-    sn76489.SetChannelOn(key, velocity, channel - MAX_CHANNELS_YM, false);
-  }
-  else if (channel >= 1 && channel <= MAX_CHANNELS_YM)
-  {
-    ym2612.SetVoiceManual(channel, voices[channel]);
-    ym2612.SetChannelOn(key, velocity, channel, false);
-  }
+  sn76489.SetChannelOn(key, velocity, channel, false);
+  ym2612.SetChannelOn(key, velocity, channel, false);
 }
 
 void KeyOff(byte channel, byte key, byte velocity)
 {
-  if (channel == MAX_CHANNELS_YM + 1)
-  {
-    sn76489.SetChannelOff(key, channel);
-  }
-  else if (channel >= 1 && channel <= MAX_CHANNELS_YM)
-  {
-    ym2612.SetChannelOff(key, channel);
-  }
+  sn76489.SetChannelOff(key, channel);
+  ym2612.SetChannelOff(key, channel);
 }
 
 void loop()
@@ -154,6 +143,8 @@ void loop()
   };
   MIDI.read();
   ui.HandleRotaryEncoder();
+  UIState *currentState = ui.GetCurrentState();
+  if (currentState->screen == MAIN_MENU)
+    ui.ScrollFileNameLCD();
   ui.TentativeRedraw();
-  ui.ScrollFileNameLCD();
 }

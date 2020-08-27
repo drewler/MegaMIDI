@@ -63,13 +63,13 @@ void UI::PushScreen(Screen screen)
   case BOOT:
     break;
   }
-  DrawCurrentScreen();
+  redrawOnNextLoop = true;
 }
 
 void UI::PopScreen()
 {
   stackLevel--;
-  DrawCurrentScreen();
+  redrawOnNextLoop = true;
 }
 
 UIState *UI::GetCurrentState()
@@ -199,7 +199,14 @@ void UI::HandleRotaryEncoder()
     UIState *currentState = GetCurrentState();
     if (currentState->selecting)
     {
-      if (currentState->screen == YAMAHA_SETTINGS)
+      if (currentState->screen == MAIN_MENU)
+      {
+        if (currentState->cursorIndex == 0 && currentState->selecting)
+        {
+          fileUtil->LoadFile(isEncoderUp ? NEXT_FILE : PREV_FILE);
+        }
+      }
+      else if (currentState->screen == YAMAHA_SETTINGS)
       {
         if (currentState->cursorIndex == 1)
         {
@@ -350,11 +357,12 @@ void UI::DrawBoot()
 
 void UI::DrawMainMenu()
 {
+  fileNameScrollIndex = 0;
   lcd->clear();
   lcd->print("||   MEGA  MIDI   ||");
   lcd->setCursor(1, 1);
   lcd->print("File");
-  // ScrollFileNameLCD();
+  ScrollFileNameLCD();
   lcd->setCursor(1, 2);
   lcd->print(yamahaString);
   lcd->print(settingsString);
@@ -469,7 +477,7 @@ void UI::DrawYamahaSlot()
     else if (lt == VOICE_LINE)
     {
       lcd->print(voiceString);
-      DrawOutOfSelector(i, slot.voiceIndex + 1, maxValidVoices);
+      DrawOutOfSelector(i, slot.voiceIndex + 1, maxValidVoices + 1);
     }
     else if (lt == MIDI_CHANNEL_LINE)
     {
@@ -634,13 +642,9 @@ void UI::IntroLEDs()
 
 void UI::ScrollFileNameLCD()
 {
-  if (!filenameScrollEnabled)
-  {
-    return;
-  }
+  String filenameString = fileUtil->fileName;
   String sbStr = fileUtil->fileName;
-  int filenameLength = sbStr.length();
-  ;
+  int filenameLength = filenameString.length();
   if (filenameLength > filenameMaxLength)
   {
     uint32_t curMilli = millis();
@@ -649,10 +653,10 @@ void UI::ScrollFileNameLCD()
     {
       prevMilli = curMilli;
       fileNameScrollIndex++;
-      if (fileNameScrollIndex + filenameMaxLength >= sbStr.length())
+      if (fileNameScrollIndex + filenameMaxLength > filenameString.length())
       {
         fileNameScrollIndex = 0;
-        scrollDelay *= 5;
+        scrollDelay *= 2.5;
       }
       else
       {
@@ -660,9 +664,7 @@ void UI::ScrollFileNameLCD()
       }
     }
   }
-  filenameColumn = LCD_COLS - sbStr.length();
-  lcd->setCursor(filenameColumn, filenameRow);
-  lcd->print(sbStr);
+  DrawFromEnd(1, filenameMaxLength, &sbStr);
 }
 
 void UI::DrawCurrentScreen()

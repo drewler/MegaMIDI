@@ -29,6 +29,4 @@ public:
   void ReadVoiceData();
 };
 
-extern FileUtil fileUtil;
-
 #endif

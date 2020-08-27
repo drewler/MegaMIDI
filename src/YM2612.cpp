@@ -23,10 +23,11 @@ void YM2612::ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t
   case VOICE_INDEX:
     if (direction == NEXT)
       slots[slotIndex].voiceIndex++;
-    if (direction == PREVIOUS)
+    if (direction == PREVIOUS && slots[slotIndex].voiceIndex > 0)
       slots[slotIndex].voiceIndex--;
     slots[slotIndex].voiceIndex = min(slots[slotIndex].voiceIndex, maxValidVoices);
     slots[slotIndex].voiceIndex = max(slots[slotIndex].voiceIndex, 0);
+    SetVoiceManual(slotIndex, voices[slots[slotIndex].voiceIndex]);
     break;
   case MIDI_CHANNEL:
     if (direction == NEXT)
@@ -59,6 +60,7 @@ void YM2612::ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t
     for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
     {
       memcpy(&slots[i], &slotBuffer, sizeof(YamahaSlot));
+      SetVoiceManual(i, voices[slots[slotIndex].voiceIndex]);
     }
   }
 }
@@ -103,7 +105,7 @@ void YM2612::send(unsigned char addr, unsigned char data, bool setA1)
   digitalWriteFast(_A0, LOW);
 }
 
-void YM2612::SetFrequency(uint16_t frequency, uint8_t channel)
+void YM2612::SetFrequency(uint16_t frequency, uint8_t slot)
 {
   int block = 2;
 
@@ -114,9 +116,12 @@ void YM2612::SetFrequency(uint16_t frequency, uint8_t channel)
     block++;
   }
   frq = (uint16_t)frequency;
-  bool setA1 = channel > 2;
-  send(0xA4 + channel % 3, ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3), setA1);
-  send(0xA0 + channel % 3, frq, setA1);
+  bool setA1 = false;
+  // bool setA1 = slot > 2;
+  send(0xA4 + slot, ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3), setA1);
+  send(0xA0 + slot, frq, setA1);
+  // send(0xA4 + channel % 3, ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3), setA1);
+  // send(0xA0 + channel % 3, frq, setA1);
 }
 
 float YM2612::NoteToFrequency(uint8_t note)
@@ -137,28 +142,48 @@ float YM2612::NoteToFrequency(uint8_t note)
   return (f + (f * TUNE)) * multiplier[(note / 12) + octaveShift];
 }
 
-void YM2612::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled)
+uint8_t chIndex = 0;
+void YM2612::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t midiChannel, bool velocityEnabled)
 {
-  uint8_t offset = slot % MAX_CHANNELS_YM;
-  bool setA1 = false; // ???
-  slots[offset].status.keyOn = true;
-  slots[offset].status.keyNumber = key;
-  slots[offset].status.sustained = false;
-  send(0x28, 0xF0 + offset + (setA1 << 2));
-  SetFrequency(NoteToFrequency(key), offset);
+  for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
+  {
+    YamahaSlot *slot = &slots[i];
+    if (slot->midiChannel == midiChannel && !slot->status.keyOn)
+    {
+      slot->status.keyOn = true;
+      slot->status.keyNumber = key;
+      slot->status.sustained = sustainEnabled;
+      bool setA1 = false; // ???
+      send(0x28, 0xF0 + i + (setA1 << 2));
+      SetFrequency(NoteToFrequency(key), i);
+      digitalWrite(leds[i], HIGH);
+      break;
+    }
+  }
+}
+
+void YM2612::SetChannelOff(uint8_t key, uint8_t midiChannel)
+{
+  for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
+  {
+    YamahaSlot *slot = &slots[i];
+    if (slot->midiChannel == midiChannel &&
+        slot->status.keyNumber == key &&
+        slot->status.keyOn)
+    {
+      slot->status.keyOn = false;
+      slot->status.keyNumber = 0;
+      slot->status.sustained = false;
+      bool setA1 = false; // ???
+      send(0x28, 0x00 + i + (setA1 << 2));
+      digitalWrite(leds[i], LOW);
+    }
+  }
 }
 
 uint8_t YM2612::GetShadowValue(uint8_t addr, bool bank)
 {
   return bank ? bank1[addr - 0x30] : bank0[addr - 0x21];
-}
-
-void YM2612::SetChannelOff(uint8_t key, uint8_t slot)
-{
-  uint8_t offset = slot % MAX_CHANNELS_YM;
-  slots[offset].status.keyOn = false;
-  bool setA1 = false; // ???
-  send(0x28, 0x00 + offset + (setA1 << 2));
 }
 
 void YM2612::ReleaseSustainedKeys()

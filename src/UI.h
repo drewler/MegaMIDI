@@ -43,10 +43,8 @@ private:
   uint8_t filenameScrollEnabled = false;
   uint8_t fileNameScrollIndex = 0;
   uint32_t prevMilli = 0;
-  uint32_t scrollDelay = 500;
-  uint8_t filenameColumn;
-  uint8_t filenameRow;
-  uint8_t filenameMaxLength;
+  uint16_t scrollDelay = 500;
+  uint8_t filenameMaxLength = 14;
   UIState stateStack[MAX_UI_NESTING];
   uint8_t stackLevel = 0;
   bool redrawOnNextLoop = false;
