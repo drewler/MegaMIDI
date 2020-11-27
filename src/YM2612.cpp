@@ -116,22 +116,19 @@ void YM2612::SetFrequency(uint16_t frequency, uint8_t slot)
     block++;
   }
   frq = (uint16_t)frequency;
-  bool setA1 = false;
-  // bool setA1 = slot > 2;
+  bool setA1 = velocityEnabled;
   send(0xA4 + slot, ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3), setA1);
   send(0xA0 + slot, frq, setA1);
-  // send(0xA4 + channel % 3, ((frq >> 8) & mask(3)) | ((block & mask(3)) << 3), setA1);
-  // send(0xA0 + channel % 3, frq, setA1);
 }
 
 float YM2612::NoteToFrequency(uint8_t note)
 {
-  //Elegant note/freq system by diegodorado
-  //Check out his project at https://github.com/diegodorado/arduinoProjects/tree/master/ym2612
+  // Elegant note/freq system by diegodorado
+  // Check out his project at https://github.com/diegodorado/arduinoProjects/tree/master/ym2612
   const static float freq[12] =
       {
-          //You can create your own note frequencies here. C4#-C5. There should be twelve entries.
-          //YM3438 datasheet note set
+          // You can create your own note frequencies here. C4#-C5. There should be twelve entries.
+          // YM3438 datasheet note set
           277.2, 293.7, 311.1, 329.6, 349.2, 370.0, 392.0, 415.3, 440.0, 466.2, 493.9, 523.3
 
       };
@@ -143,20 +140,22 @@ float YM2612::NoteToFrequency(uint8_t note)
 }
 
 uint8_t chIndex = 0;
-void YM2612::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t midiChannel, bool velocityEnabled)
+void YM2612::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t midiChannel)
 {
   for (uint8_t i = 0; i < MAX_CHANNELS_YM; i++)
   {
     YamahaSlot *slot = &slots[i];
-    if (slot->midiChannel == midiChannel && !slot->status.keyOn)
+    if (slot->midiChannel == midiChannel &&
+        key >= slot->keyRangeStart &&
+        key <= slot->keyRangeEnd &&
+        !slot->status.keyOn)
     {
       slot->status.keyOn = true;
       slot->status.keyNumber = key;
       slot->status.sustained = sustainEnabled;
-      bool setA1 = false; // ???
+      bool setA1 = velocityEnabled;
       send(0x28, 0xF0 + i + (setA1 << 2));
       SetFrequency(NoteToFrequency(key), i);
-      digitalWrite(leds[i], HIGH);
       break;
     }
   }
@@ -169,12 +168,14 @@ void YM2612::SetChannelOff(uint8_t key, uint8_t midiChannel)
     YamahaSlot *slot = &slots[i];
     if (slot->midiChannel == midiChannel &&
         slot->status.keyNumber == key &&
+        key >= slot->keyRangeStart &&
+        key <= slot->keyRangeEnd &&
         slot->status.keyOn)
     {
       slot->status.keyOn = false;
       slot->status.keyNumber = 0;
       slot->status.sustained = false;
-      bool setA1 = false; // ???
+      bool setA1 = velocityEnabled;
       send(0x28, 0x00 + i + (setA1 << 2));
       digitalWrite(leds[i], LOW);
     }
@@ -393,7 +394,7 @@ void YM2612::ToggleLFO()
   {
     uint8_t lfo = (1 << 3) | lfoFrq;
     send(0x22, lfo);
-    //This is a bulky way to do this, but it works so....
+    // This is a bulky way to do this, but it works so....
     for (int a1 = 0; a1 <= 1; a1++)
     {
       for (int i = 0; i < 3; i++)
@@ -564,7 +565,7 @@ void YM2612::SetAmplitudeModulation(uint8_t slot, uint8_t op, bool value)
 void YM2612::SetLFOEnabled(bool value)
 {
   uint8_t data = GetShadowValue(0x22, 0);
-  data &= 0b11110111; //Mask LFOFrq
+  data &= 0b11110111; // Mask LFOFrq
   data |= value << 3;
   send(0x22, data, false);
 }
@@ -634,7 +635,7 @@ void YM2612::SetFMFeedback(uint8_t slot, uint8_t value)
   send(addr, data, a1);
 }
 
-//Notes
+// Notes
 // DIGITAL BUS = PF0-PF7
 // IC = PC0/10
 // CS = PC1/11

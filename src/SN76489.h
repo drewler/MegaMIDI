@@ -25,6 +25,7 @@ public:
   SN76489();
   SNSlot slots[MAX_CHANNELS_PSG];
   OperationMode mode;
+  bool velocityEnabled = false;
   bool sustainEnabled = false;
   void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled);
   void SetChannelOff(uint8_t key, uint8_t slot);

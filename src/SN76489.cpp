@@ -161,22 +161,32 @@ void SN76489::SetNoiseOff(uint8_t key)
     UpdateAttenuation(noise);
 }
 
-void SN76489::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t midiChannel, bool velocityEnabled)
+void SN76489::SetChannelOn(uint8_t key, uint8_t velocity, uint8_t midiChannel)
 {
   bool updateAttenuationFlag;
   for (uint8_t i = 0; i < MAX_CHANNELS_PSG; i++)
   {
     SNSlot *slot = &slots[i];
-    if (slot->midiChannel == midiChannel && !slot->status.keyOn)
+    if (slot->midiChannel == midiChannel &&
+        key >= slot->keyRangeStart &&
+        key <= slot->keyRangeEnd &&
+        !slot->status.keyOn)
     {
       slot->status.keyOn = true;
       slot->status.keyNumber = key;
       slot->status.sustained = sustainEnabled;
-      currentVelocity[i] = 127;
-      currentNote[i] = key;
-      updateAttenuationFlag = UpdateSquarePitch(i);
-      if (updateAttenuationFlag)
-        UpdateAttenuation(i);
+      if (i == MAX_CHANNELS_PSG - 1)
+      {
+        SetNoiseOn(key, velocity, velocityEnabled);
+      }
+      else
+      {
+        currentVelocity[i] = velocityEnabled ? velocity : 127;
+        currentNote[i] = key;
+        updateAttenuationFlag = UpdateSquarePitch(i);
+        if (updateAttenuationFlag)
+          UpdateAttenuation(i);
+      }
       break;
     }
   }
@@ -189,14 +199,22 @@ void SN76489::SetChannelOff(uint8_t key, uint8_t midiChannel)
     SNSlot *slot = &slots[i];
     if (slot->midiChannel == midiChannel &&
         slot->status.keyNumber == key &&
+        key >= slot->keyRangeStart &&
+        key <= slot->keyRangeEnd &&
         slot->status.keyOn)
     {
       slot->status.keyOn = false;
       slot->status.keyNumber = 0;
       slot->status.sustained = false;
-      currentVelocity[i] = 0;
-      UpdateAttenuation(i);
-      digitalWrite(leds[i], LOW);
+      if (i == MAX_CHANNELS_PSG - 1)
+      {
+        SetNoiseOff(key);
+      }
+      else
+      {
+        currentVelocity[i] = 0;
+        UpdateAttenuation(i);
+      }
     }
   }
 }

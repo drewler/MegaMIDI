@@ -126,8 +126,8 @@ void ResetSoundChips()
  */
 void KeyOn(byte channel, byte key, byte velocity)
 {
-  sn76489.SetChannelOn(key, velocity, channel, false);
-  ym2612.SetChannelOn(key, velocity, channel, false);
+  sn76489.SetChannelOn(key, velocity, channel);
+  ym2612.SetChannelOn(key, velocity, channel);
 }
 
 void KeyOff(byte channel, byte key, byte velocity)

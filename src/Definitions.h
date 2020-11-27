@@ -50,6 +50,8 @@ typedef struct
   byte midiChannel = 1;
   signed char octaveShift = 0;
   signed char transposeShift = 0;
+  byte keyRangeStart = 0x00;
+  byte keyRangeEnd = 0xff;
   SlotStatus status;
   uint8_t voiceIndex;
 } YamahaSlot;
@@ -60,8 +62,9 @@ typedef struct
   byte midiChannel = 2;
   signed char octaveShift = 0;
   signed char transposeShift = 0;
+  byte keyRangeStart = 0x00;
+  byte keyRangeEnd = 0xff;
   SlotStatus status;
-  byte noise;
 } SNSlot;
 
 // OPM File Format https://vgmrips.net/wiki/OPM_File_Format

@@ -32,10 +32,10 @@ public:
   unsigned char pitchBendYMRange = 2;
   int pitchBendYM = 2;
   bool lfoOn = false;
-  void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled);
+  void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot);
   void SetChannelOff(uint8_t key, uint8_t slot);
   void SetVoice(Voice v);
-  void ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter , uint8_t direction);
+  void ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t direction);
 
   float NoteToFrequency(uint8_t note);
   void SetFrequency(uint16_t frequency, uint8_t channel);
