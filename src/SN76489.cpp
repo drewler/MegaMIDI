@@ -13,6 +13,8 @@ SN76489::SN76489()
   {
     slots[i].index = i;
   }
+  // set up noise channel
+  slots[MAX_CHANNELS_PSG - 1].midiChannel = 16;
 }
 
 void SN76489::Reset()
@@ -29,7 +31,11 @@ void SN76489::ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_
   switch (parameter)
   {
   case NOISE:
-    // TODO
+    if (direction == NEXT && noiseControlData < NOISE_WHITE_SLOT_3)
+      noiseControlData++;
+    if (direction == PREVIOUS && noiseControlData > 0)
+      noiseControlData--;
+    UpdateNoiseControl();
     break;
   case MIDI_CHANNEL:
     if (direction == NEXT)
@@ -68,13 +74,13 @@ void SN76489::ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_
 
 void SN76489::send(uint8_t data)
 {
-  //Byte 1
-  // 1   REG ADDR        DATA
-  //|1| |R0|R1|R2| |F6||F7|F8|F9|
+  // Byte 1
+  //  1   REG ADDR       DATA
+  // |1| |R0|R1|R2| |F6||F7|F8|F9|
 
-  //Byte 2
-  //  0           DATA
-  //|0|0| |F0|F1|F2|F3|F4|F5|
+  // Byte 2
+  //   0          DATA
+  // |0|0| |F0|F1|F2|F3|F4|F5|
 
   digitalWriteFast(_WE, HIGH);
   PORTF = data;
@@ -90,54 +96,6 @@ void SN76489::MIDISetNoiseControl(byte control, byte value)
 
 bool SN76489::UpdateNoiseControl()
 {
-  byte noiseControlData;
-
-  switch (currentNote[noise])
-  {
-  case 60:
-    // Note: C4, Periodic noise, shift rate = clock speed (Hz) / 512
-    noiseControlData = 0x00;
-    break;
-
-  case 62:
-    // Note: D4, Periodic noise, shift rate = clock speed (Hz) / 1024
-    noiseControlData = 0x01;
-    break;
-
-  case 64:
-    // Note: E4, Periodic noise, shift rate = clock speed (Hz) / 2048
-    noiseControlData = 0x02;
-    break;
-
-  case 65:
-    // Note: F4, Perioic noise, shift rate = Square voice 3 frequency
-    noiseControlData = 0x03;
-    break;
-
-  case 67:
-    // Note: G4, White noise, shift rate = clock speed (Hz) / 512
-    noiseControlData = 0x04;
-    break;
-
-  case 69:
-    // Note: A4, White noise, shift rate = clock speed (Hz) / 1024
-    noiseControlData = 0x05;
-    break;
-
-  case 71:
-    // Note: B4, White noise, shift rate = clock speed (Hz) / 2048
-    noiseControlData = 0x06;
-    break;
-
-  case 72:
-    // Note: C5, White noise, shift rate = Square voice 3 frequency
-    noiseControlData = 0x07;
-    break;
-
-  default:
-    return false;
-  }
-
   // Send the noise control byte to the SN76489 and return true
   send(0x80 | 0x60 | noiseControlData);
   return true;

@@ -67,6 +67,18 @@ typedef struct
   SlotStatus status;
 } SNSlot;
 
+enum NoiseType
+{
+  NOISE_PERIODIC_512 = 0x00,
+  NOISE_PERIODIC_1024 = 0x01,
+  NOISE_PERIODIC_2048 = 0x02,
+  NOISE_PERIODIC_SLOT_3 = 0x03,
+  NOISE_WHITE_512 = 0x04,
+  NOISE_WHITE_1024 = 0x05,
+  NOISE_WHITE_2048 = 0x06,
+  NOISE_WHITE_SLOT_3 = 0x07,
+};
+
 // OPM File Format https://vgmrips.net/wiki/OPM_File_Format
 typedef struct
 {

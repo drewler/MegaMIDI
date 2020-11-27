@@ -5,7 +5,7 @@
 
 #include "Definitions.h"
 
-#define MAX_CHANNELS_PSG 3
+#define MAX_CHANNELS_PSG 4
 
 //SN76489 MIDI driver example by: https://github.com/cdodd/teensy-sn76489-midi-synth/blob/master/teensy-sn76489-midi-synth.ino
 const int noise = 3;
@@ -27,7 +27,8 @@ public:
   OperationMode mode;
   bool velocityEnabled = false;
   bool sustainEnabled = false;
-  void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot, bool velocityEnabled);
+  byte noiseControlData;
+  void SetChannelOn(uint8_t key, uint8_t velocity, uint8_t slot);
   void SetChannelOff(uint8_t key, uint8_t slot);
   void SetNoiseOn(uint8_t key, uint8_t velocity, bool velocityEnabled);
   void ChangeSlotParam(uint8_t slotIndex, SlotParameter parameter, uint8_t direction);

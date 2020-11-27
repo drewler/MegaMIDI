@@ -58,7 +58,7 @@ void UI::PushScreen(Screen screen)
     break;
   case YAMAHA_SLOT:
   case SN_SLOT:
-    stateStack[stackLevel].itemsCount = 5;
+    stateStack[stackLevel].itemsCount = 4;
     break;
   case BOOT:
     break;
@@ -249,7 +249,7 @@ void UI::HandleRotaryEncoder()
         switch (currentState->cursorIndex)
         {
         case 1: // Noise
-          // sn76489->ChangeSlotParam(slotIndex, NOISE, isEncoderUp ? NEXT : PREVIOUS);
+          sn76489->ChangeSlotParam(slotIndex, NOISE, isEncoderUp ? NEXT : PREVIOUS);
           break;
         case 2: // MIDI channel
           sn76489->ChangeSlotParam(slotIndex, MIDI_CHANNEL, isEncoderUp ? NEXT : PREVIOUS);
@@ -552,6 +552,11 @@ void UI::DrawSNSlotLine(uint8_t row, SNSlot *slot)
       slot->transposeShift,
       slot->octaveShift);
   lcd->print(buffer);
+  if (slot->index == MAX_CHANNELS_PSG)
+  {
+    lcd->setCursor(3, row);
+    lcd->write("NOI");
+  }
 }
 
 void UI::DrawSNSlot()
@@ -570,11 +575,19 @@ void UI::DrawSNSlot()
   };
   LineType items[5] = {
       BACK_LINE,
-      NOISE_LINE,
       MIDI_CHANNEL_LINE,
       OCTAVE_SHIFT_LINE,
       TRANSPOSE_SHIFT_LINE,
   };
+  if (previousState.screen == SN_SLOTS && previousState.cursorIndex == 5)
+  {
+    items[0] = BACK_LINE;
+    items[1] = NOISE_LINE;
+    items[2] = MIDI_CHANNEL_LINE;
+    items[3] = OCTAVE_SHIFT_LINE;
+    items[4] = TRANSPOSE_SHIFT_LINE;
+    currentState->itemsCount = 5;
+  }
 
   uint8_t slotIndex = previousState.screen == SN_SLOTS ? previousState.cursorIndex - 1 : 0;
   SNSlot slot = sn76489->slots[slotIndex];
@@ -590,7 +603,34 @@ void UI::DrawSNSlot()
     else if (lt == NOISE_LINE)
     {
       lcd->print(noiseString);
-      // DrawOutOfSelector(i, slot.voiceIndex + 1, maxValidVoices);
+      uint8_t maxNoiseStringLength = LCD_COLS - 6;
+      switch (sn76489->noiseControlData)
+      {
+      case NOISE_PERIODIC_512:
+        DrawFromEnd(i, 21, &String("Periodic f/512"));
+        break;
+      case NOISE_PERIODIC_1024:
+        DrawFromEnd(i, 21, &String("Periodic f/1024"));
+        break;
+      case NOISE_PERIODIC_2048:
+        DrawFromEnd(i, 21, &String("Periodic f/2048"));
+        break;
+      case NOISE_PERIODIC_SLOT_3:
+        DrawFromEnd(i, 21, &String("Periodic Slot 3"));
+        break;
+      case NOISE_WHITE_512:
+        DrawFromEnd(i, 21, &String("White f/512"));
+        break;
+      case NOISE_WHITE_1024:
+        DrawFromEnd(i, 21, &String("White f/1024"));
+        break;
+      case NOISE_WHITE_2048:
+        DrawFromEnd(i, 21, &String("White f/2048"));
+        break;
+      case NOISE_WHITE_SLOT_3:
+        DrawFromEnd(i, 21, &String("White Slot 3"));
+        break;
+      }
     }
     else if (lt == MIDI_CHANNEL_LINE)
     {
